@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/bryanwee023/employment-simulator/employee/actions"
@@ -12,14 +11,19 @@ import (
 type Agent struct {
 	employee Employee
 	llm      LLM
+	logger   *Logger
 	actions  map[string]actions.Action
 }
 
-func NewAgent(employee Employee, llm LLM, actions map[string]actions.Action) *Agent {
-	return &Agent{employee: employee, llm: llm, actions: actions}
+func NewAgent(employee Employee, llm LLM, actions map[string]actions.Action, logger *Logger) *Agent {
+	return &Agent{employee: employee, llm: llm, actions: actions, logger: logger}
 }
 
 func (a *Agent) Handle(email Email) error {
+	logger = a.logger
+
+	logger.Log("Received email", email)
+
 	systemPrompt, userPrompt := a.buildPrompts(email)
 
 	response, err := a.llm.Chat(systemPrompt, userPrompt)
@@ -27,13 +31,15 @@ func (a *Agent) Handle(email Email) error {
 		return fmt.Errorf("llm call failed: %w", err)
 	}
 
+	logger.Log("LLM response", response)
+
 	err, hint := a.execute(response)
 	if err != nil {
 		return fmt.Errorf("failed to execute action: %w", err)
 	}
 
 	if hint != "" {
-		log.Printf("Hint from execution: %s", hint)
+		logger.Log("Hint from execution", hint)
 		// TODO: Relay hint to llm call and try again.
 	}
 
@@ -70,10 +76,12 @@ func (a *Agent) execute(response string) (error, string) {
 		return nil, "invalid json structure"
 	}
 
-	action, ok := a.actions[strings.ToLower(choice.ActionName)]
+	actionName := strings.ToLower(choice.ActionName)
+	action, ok := a.actions[actionName]
 	if !ok {
 		return nil, "unknown action"
 	}
 
+	a.logger.Log(actionName, choice.Arguments)
 	return action.Execute(choice.Arguments)
 }

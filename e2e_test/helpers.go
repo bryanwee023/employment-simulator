@@ -3,8 +3,10 @@
 package e2etest
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -19,6 +21,16 @@ type Email struct {
 	From    Employee `json:"from"`
 	Subject string   `json:"subject"`
 	Body    string   `json:"body"`
+}
+
+type LogEntry struct {
+	Timestamp time.Time       `json:"timestamp"`
+	Event     string          `json:"event"`
+	Data      json.RawMessage `json:"data"`
+}
+
+func (e LogEntry) String() string {
+	return fmt.Sprintf("[%s] %s: %s", e.Timestamp.Format(time.DateTime), e.Event, e.Data)
 }
 
 func getEmployeeURL(i int) string {

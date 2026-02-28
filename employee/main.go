@@ -13,6 +13,7 @@ import (
 )
 
 var self Employee
+var logger *Logger
 
 func main() {
 	amqpURL := os.Getenv("RABBITMQ_URL")
@@ -40,8 +41,10 @@ func main() {
 
 	log.Printf("Registered as %s (%s)", self.Name, self.Role)
 
+	logger = NewLogger()
+
 	model := llm.NewOllamaLLM(ollamaURL)
-	agent := NewAgent(self, model, actions.Actions)
+	agent := NewAgent(self, model, actions.Actions, logger)
 
 	if err := startEmailLoop(amqpURL, agent); err != nil {
 		log.Fatalf("Failed to start email loop: %v", err)
@@ -49,6 +52,7 @@ func main() {
 
 	http.HandleFunc("/me", meHandler)
 	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/logs", logsHandler)
 
 	log.Println("Employee service starting on :8081")
 	log.Fatal(http.ListenAndServe(":8081", nil))
@@ -66,6 +70,11 @@ func meHandler(w http.ResponseWriter, r *http.Request) {
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"status": "ok"}`)
+}
+
+func logsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(logger.Entries())
 }
 
 // ============================

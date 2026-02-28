@@ -4,6 +4,9 @@ package e2etest
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -41,6 +44,7 @@ func TestDoNothing(t *testing.T) {
 	t.Log("Published do-nothing email, waiting for consumer to ack...")
 
 	// Poll the queue until the message is consumed or timeout.
+	consumed := false
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		q, err := ch.QueueDeclarePassive(queueName, true, false, false, false, nil)
@@ -48,11 +52,47 @@ func TestDoNothing(t *testing.T) {
 			t.Fatalf("Failed to inspect queue: %v", err)
 		}
 		if q.Messages == 0 {
+			consumed = true
 			t.Log("Message consumed successfully")
-			return
+			break
 		}
 		time.Sleep(1 * time.Second)
 	}
+	if !consumed {
+		t.Fatal("Timed out waiting for message to be consumed")
+	}
 
-	t.Fatal("Timed out waiting for message to be consumed")
+	// Wait a bit for the agent to finish processing and logging.
+	time.Sleep(5 * time.Second)
+
+	// Query the employee's logs to verify the do_nothing action was chosen.
+	resp, err := http.Get(fmt.Sprintf("%s/logs", getEmployeeURL(0)))
+	if err != nil {
+		t.Fatalf("Failed to fetch logs: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read logs response: %v", err)
+	}
+
+	logs := string(body)
+
+	var logEntries []LogEntry
+	if err := json.Unmarshal([]byte(logs), &logEntries); err != nil {
+		t.Fatalf("Failed to unmarshal logs: %v", err)
+	}
+
+	found := false
+	for _, entry := range logEntries {
+		if entry.Event == "do_nothing" {
+			found = true
+		}
+	}
+
+	t.Log("Found do_nothing action in logs")
+	if !found {
+		t.Fatal("Expected logs to contain do_nothing action")
+	}
 }
