@@ -2,7 +2,10 @@ package actions
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 )
 
 var ActionGetOrgChart = Action{
@@ -13,6 +16,21 @@ var ActionGetOrgChart = Action{
 
 func getOrgChart(args json.RawMessage) (error, string) {
 	log.Println("Fetching org chart")
-	// TODO: Implement actual org chart retrieval
-	return nil, "{}"
+
+	resp, err := http.Get(OfficeURL + "/org-chart")
+	if err != nil {
+		return fmt.Errorf("failed to reach office: %w", err), ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("office returned status %d", resp.StatusCode), ""
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err), ""
+	}
+
+	return nil, string(body)
 }

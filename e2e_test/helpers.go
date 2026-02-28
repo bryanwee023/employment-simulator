@@ -3,6 +3,7 @@
 package e2etest
 
 import (
+	"fmt"
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -18,6 +19,18 @@ type Email struct {
 	From    Employee `json:"from"`
 	Subject string   `json:"subject"`
 	Body    string   `json:"body"`
+}
+
+func getEmployeeURL(i int) string {
+	return fmt.Sprintf("http://localhost:%d", 8081+i)
+}
+
+func getOfficeURL() string {
+	url := os.Getenv("OFFICE_URL")
+	if url == "" {
+		url = "http://localhost:8080"
+	}
+	return url
 }
 
 func getRabbitMqClient() (*amqp.Connection, *amqp.Channel, error) {

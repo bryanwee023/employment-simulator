@@ -20,6 +20,8 @@ func (a Action) String() string {
 	return fmt.Sprintf("%s", a.Description)
 }
 
+var OfficeURL string
+
 var Actions = map[string]Action{
 	"send_email":    ActionSendEmail,
 	"do_nothing":    ActionDoNothing,

@@ -10,11 +10,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// Publishes a "do nothing" email and verifies the employee
+// Publishes a "get org chart" email and verifies the employee
 // service consumes it (message gets acked off the queue).
 //
 // Requires: RabbitMQ + employee service running (e.g. via docker-compose.test.yml).
-func TestDoNothing(t *testing.T) {
+func TestGetOrgChart(t *testing.T) {
 	conn, ch, err := getRabbitMqClient()
 	if err != nil {
 		t.Fatalf("Failed to get RabbitMQ client: %v", err)
@@ -25,8 +25,8 @@ func TestDoNothing(t *testing.T) {
 	queueName := "emails.emp-1"
 	email := Email{
 		From:    Employee{ID: "emp-1", Name: "Employee 1", Role: "Staff"},
-		Subject: "No action needed",
-		Body:    "This is a useless email. Do nothing.",
+		Subject: "Get Org Chart",
+		Body:    "Please get the org chart of the company.",
 	}
 	body, _ := json.Marshal(email)
 
@@ -38,7 +38,7 @@ func TestDoNothing(t *testing.T) {
 		t.Fatalf("Failed to publish email: %v", err)
 	}
 
-	t.Log("Published do-nothing email, waiting for consumer to ack...")
+	t.Log("Published get org chart email, waiting for consumer to ack...")
 
 	// Poll the queue until the message is consumed or timeout.
 	deadline := time.Now().Add(30 * time.Second)

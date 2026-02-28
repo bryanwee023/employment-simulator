@@ -9,5 +9,5 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/employee .
 
-EXPOSE 8080
-ENTRYPOINT ["./employee"]
+EXPOSE 8081
+CMD ["./employee"]

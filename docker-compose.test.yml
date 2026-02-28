@@ -27,15 +27,29 @@ services:
       timeout: 10s
       retries: 5
 
-  kevin:
+  office:
+    build: ./office
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: wget -qO- http://localhost:8080/health || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  employee1:
     build: ./employee
+    ports:
+      - "8081:8081"
     depends_on:
       rabbitmq:
         condition: service_healthy
-    command: ["kevin1"]
+      office:
+        condition: service_healthy
     environment:
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - OFFICE_URL=http://office:8080
 
 volumes:
   ollama_data:

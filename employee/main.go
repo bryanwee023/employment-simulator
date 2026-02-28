@@ -12,40 +12,56 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+var self Employee
+
 func main() {
 	amqpURL := os.Getenv("RABBITMQ_URL")
 	if amqpURL == "" {
 		amqpURL = "amqp://guest:guest@localhost:5672/"
 	}
 
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: employee <employee_id>")
-	}
-	employeeID := os.Args[1]
-
 	ollamaURL := os.Getenv("OLLAMA_URL")
 	if ollamaURL == "" {
 		ollamaURL = "http://localhost:11434"
 	}
 
-	// TODO: Query name and role from a database or an orchestrator service
-	employee := Employee{ID: employeeID, Name: "Kevin Stone", Role: "Alignment Manager"}
-	model := llm.NewOllamaLLM(ollamaURL)
-	agent := NewAgent(employee, model, actions.Actions)
+	officeURL := os.Getenv("OFFICE_URL")
+	if officeURL == "" {
+		officeURL = "http://localhost:8080"
+	}
 
-	if err := startEmailLoop(amqpURL, employeeID, agent); err != nil {
+	actions.OfficeURL = officeURL
+
+	var err error
+	self, err = fetchEmployee(officeURL)
+	if err != nil {
+		log.Fatalf("Failed to fetch employee from office: %v", err)
+	}
+
+	log.Printf("Registered as %s (%s)", self.Name, self.Role)
+
+	model := llm.NewOllamaLLM(ollamaURL)
+	agent := NewAgent(self, model, actions.Actions)
+
+	if err := startEmailLoop(amqpURL, agent); err != nil {
 		log.Fatalf("Failed to start email loop: %v", err)
 	}
 
+	http.HandleFunc("/me", meHandler)
 	http.HandleFunc("/health", healthHandler)
 
-	log.Println("Employee service starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("Employee service starting on :8081")
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
 // ============================
 // Handlers
 // ============================
+
+func meHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(self)
+}
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -56,7 +72,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // Loops
 // ============================
 
-func startEmailLoop(url, employeeId string, agent *Agent) error {
+func startEmailLoop(url string, agent *Agent) error {
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
@@ -68,7 +84,7 @@ func startEmailLoop(url, employeeId string, agent *Agent) error {
 		return fmt.Errorf("failed to open channel: %w", err)
 	}
 
-	queueName := "emails." + employeeId
+	queueName := "emails." + self.ID
 	_, err = ch.QueueDeclare(queueName, true, false, false, false, nil)
 	if err != nil {
 		ch.Close()
