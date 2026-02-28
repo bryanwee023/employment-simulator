@@ -1,0 +1,41 @@
+services:
+  ollama:
+    profiles: ["ollama"]
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: curl -f http://localhost:11434/api/tags || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  kevin:
+    build: ./employee
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["kevin1"]
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+
+volumes:
+  ollama_data:
