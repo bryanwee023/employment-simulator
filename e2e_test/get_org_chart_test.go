@@ -27,7 +27,7 @@ func TestGetOrgChart(t *testing.T) {
 
 	queueName := "emails.emp-1"
 	email := Email{
-		From:    Employee{ID: "emp-1", Name: "Employee 1", Role: "Staff"},
+		From:    Employee{ID: "ceo", Name: "The CEO", Role: "CEO"},
 		Subject: "Get Org Chart",
 		Body:    "Please get the org chart of the company.",
 	}

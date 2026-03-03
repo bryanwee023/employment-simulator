@@ -25,8 +25,8 @@ func TestEmployees(t *testing.T) {
 		t.Fatalf("Failed to decode org chart: %v", err)
 	}
 
-	if len(employees) != 1 {
-		t.Fatalf("Expected 1 employee in org chart, got %d", len(employees))
+	if len(employees) != 2 {
+		t.Fatalf("Expected 2 employees in org chart, got %d", len(employees))
 	}
 
 	for i := range employees {

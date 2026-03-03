@@ -27,7 +27,7 @@ func TestDoNothing(t *testing.T) {
 
 	queueName := "emails.emp-1"
 	email := Email{
-		From:    Employee{ID: "emp-1", Name: "Employee 1", Role: "Staff"},
+		From:    Employee{ID: "ceo", Name: "The CEO", Role: "CEO"},
 		Subject: "No action needed",
 		Body:    "This is a useless email. Do nothing.",
 	}
