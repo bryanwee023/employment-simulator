@@ -9,7 +9,7 @@ import (
 
 	"github.com/bryanwee023/employment-simulator/employee/actions"
 	"github.com/bryanwee023/employment-simulator/employee/llm"
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/bryanwee023/employment-simulator/employee/mail"
 )
 
 var self Employee
@@ -41,12 +41,17 @@ func main() {
 
 	log.Printf("Registered as %s (%s)", self.Name, self.Role)
 
+	mailer, err := mail.NewMailer(amqpURL, self.ID, self.Name, self.Role)
+	if err != nil {
+		log.Fatalf("Failed to initialize mailer: %v", err)
+	}
+
 	logger = NewLogger()
 
 	model := llm.NewOllamaLLM(ollamaURL)
-	agent := NewAgent(self, model, actions.Actions, logger)
+	agent := NewAgent(self, model, actions.NewActions(mailer), logger)
 
-	if err := startEmailLoop(amqpURL, agent); err != nil {
+	if err := startEmailLoop(mailer, agent); err != nil {
 		log.Fatalf("Failed to start email loop: %v", err)
 	}
 
@@ -81,39 +86,15 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 // Loops
 // ============================
 
-func startEmailLoop(url string, agent *Agent) error {
-	conn, err := amqp.Dial(url)
+func startEmailLoop(mailer *mail.Mailer, agent *Agent) error {
+	msgs, err := mailer.Receive(self.ID)
 	if err != nil {
-		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+		return fmt.Errorf("failed to start receiving emails: %w", err)
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("failed to open channel: %w", err)
-	}
-
-	queueName := "emails." + self.ID
-	_, err = ch.QueueDeclare(queueName, true, false, false, false, nil)
-	if err != nil {
-		ch.Close()
-		conn.Close()
-		return fmt.Errorf("failed to declare queue %s: %w", queueName, err)
-	}
-
-	msgs, err := ch.Consume(queueName, "", false, false, false, false, nil)
-	if err != nil {
-		ch.Close()
-		conn.Close()
-		return fmt.Errorf("failed to start consuming: %w", err)
-	}
-
-	log.Printf("Listening for emails on queue %s", queueName)
+	log.Printf("Listening for emails on queue emails.%s", self.ID)
 
 	go func() {
-		defer conn.Close()
-		defer ch.Close()
-
 		for msg := range msgs {
 			var email Email
 			if err := json.Unmarshal(msg.Body, &email); err != nil {

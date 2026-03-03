@@ -3,6 +3,8 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/bryanwee023/employment-simulator/employee/mail"
 )
 
 // ExecuteFn executes an action with the given JSON arguments.
@@ -22,8 +24,10 @@ func (a Action) String() string {
 
 var OfficeURL string
 
-var Actions = map[string]Action{
-	"send_email":    ActionSendEmail,
-	"do_nothing":    ActionDoNothing,
-	"get_org_chart": ActionGetOrgChart,
+func NewActions(mailer *mail.Mailer) map[string]Action {
+	return map[string]Action{
+		"send_email":    SendEmailAction(mailer),
+		"do_nothing":    ActionDoNothing,
+		"get_org_chart": ActionGetOrgChart,
+	}
 }
