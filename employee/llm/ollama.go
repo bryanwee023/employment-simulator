@@ -10,11 +10,15 @@ import (
 const ollamaModel = "llama3.2:1b"
 
 type OllamaLLM struct {
-	url string
+	url     string
+	history []ollamaMessage
 }
 
 func NewOllamaLLM(url string) *OllamaLLM {
-	return &OllamaLLM{url: url}
+	return &OllamaLLM{
+		url:     url,
+		history: []ollamaMessage{},
+	}
 }
 
 type ollamaRequest struct {
@@ -33,15 +37,24 @@ type ollamaResponse struct {
 	Message ollamaMessage `json:"message"`
 }
 
-func (o *OllamaLLM) Chat(systemPrompt, userPrompt string) (string, error) {
+func (o *OllamaLLM) StartSession(systemPrompt string) {
+	o.history = []ollamaMessage{
+		{Role: "system", Content: systemPrompt},
+	}
+}
+
+func (o *OllamaLLM) Chat(userPrompt string) (string, error) {
+	o.history = append(o.history, ollamaMessage{Role: "user", Content: userPrompt})
+
+	// Copy for the request so we can release the lock before the HTTP call
+	messages := make([]ollamaMessage, len(o.history))
+	copy(messages, o.history)
+
 	reqBody := ollamaRequest{
-		Model: ollamaModel,
-		Messages: []ollamaMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-		Stream: false,
-		Format: "json",
+		Model:    ollamaModel,
+		Messages: messages,
+		Stream:   false,
+		Format:   "json",
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -64,5 +77,15 @@ func (o *OllamaLLM) Chat(systemPrompt, userPrompt string) (string, error) {
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	// Append assistant response to session history
+	o.history = append(o.history, ollamaMessage{
+		Role:    "assistant",
+		Content: ollamaResp.Message.Content,
+	})
+
 	return ollamaResp.Message.Content, nil
+}
+
+func (o *OllamaLLM) ClearSession() {
+	o.history = []ollamaMessage{}
 }

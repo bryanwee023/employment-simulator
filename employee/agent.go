@@ -25,22 +25,28 @@ func (a *Agent) Handle(email Email) error {
 	logger.Log("Received email", email)
 
 	systemPrompt, userPrompt := a.buildPrompts(email)
+	a.llm.StartSession(systemPrompt)
 
-	response, err := a.llm.Chat(systemPrompt, userPrompt)
-	if err != nil {
-		return fmt.Errorf("llm call failed: %w", err)
+	hint := userPrompt
+	retries := 0
+
+	for hint != "" && retries < 3 {
+		response, err := a.llm.Chat(hint)
+		if err != nil {
+			return fmt.Errorf("llm call failed: %w", err)
+		}
+
+		err, hint = a.execute(response)
+		if err != nil {
+			return fmt.Errorf("failed to execute action: %w", err)
+		}
+		retries++
 	}
 
-	logger.Log("LLM response", response)
-
-	err, hint := a.execute(response)
-	if err != nil {
-		return fmt.Errorf("failed to execute action: %w", err)
-	}
+	a.llm.ClearSession()
 
 	if hint != "" {
-		logger.Log("Hint from execution", hint)
-		// TODO: Relay hint to llm call and try again.
+		return fmt.Errorf("failed to resolve action after 3 retries")
 	}
 
 	return nil
@@ -50,10 +56,12 @@ func (a *Agent) buildPrompts(email Email) (string, string) {
 	actionsJSON, _ := json.Marshal(a.actions)
 
 	systemPrompt := fmt.Sprintf(
-		"You are a %s (%s).\n"+
+		"You are %s (%s).\n"+
 			"Given the received email below, decide which action to take.\n"+
 			"Available actions: %s\n"+
-			"Respond with JSON: {\"action\": \"<action_name>\", \"arguments\": {...}}",
+			"Respond with JSON: {\"action\": \"<action_name>\", \"arguments\": {...}}\n"+
+			"Arguments must be plain values, not objects. Example:\n"+
+			"{\"action\": \"send_email\", \"arguments\": {\"to\": \"emp-3\", \"subject\": \"Hi\", \"body\": \"Hello\"}}",
 		a.employee.Name,
 		a.employee.Role,
 		string(actionsJSON),

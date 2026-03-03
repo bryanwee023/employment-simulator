@@ -16,5 +16,7 @@ type Email struct {
 
 // LLM is the interface for language model backends
 type LLM interface {
-	Chat(systemPrompt, userPrompt string) (string, error)
+	Chat(userPrompt string) (string, error)
+	StartSession(systemPrompt string)
+	ClearSession()
 }
